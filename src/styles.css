@@ -1,0 +1,223 @@
+/* Modern UI theme and layout */
+.html,body,#root { }
+html,body,#root { height: 100%; margin: 0; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background: radial-gradient(1400px 700px at 5% 10%, rgba(99,102,241,0.06), transparent), linear-gradient(180deg,#f0f5ff, #f9fbff); }
+.min-h-screen { min-height: 100vh; }
+.grid { display: grid; }
+.gap-3 { gap: 0.6rem; }
+.p-6 { padding: 1rem; }
+.p-4 { padding: 0.85rem; }
+.rounded { border-radius: 0.6rem; }
+.bg-white { background: #fff; }
+.shadow { box-shadow: 0 6px 20px rgba(16,24,40,0.06); }
+.text-2xl { font-size: 1.25rem; }
+.font-bold { font-weight: 700; }
+.text-sm { font-size: .88rem; color: #374151; }
+.text-right { text-align: right; }
+.aspect-square { aspect-ratio: 1 / 1; }
+.rounded-lg { border-radius: 0.65rem; }
+.text-3xl { font-size: 1.25rem; }
+.text-xl { font-size: 1rem; }
+.focus\:outline-none:focus { outline: none; }
+.focus\:ring-4:focus { box-shadow: 0 0 0 4px rgba(99,102,241,0.12); }
+.bg-gradient-to-br { background-image: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; }
+
+/* Layout helpers to keep the game inside the viewport */
+.container {
+	max-width: 1100px;
+	margin: 24px auto;
+	padding: 18px;
+	background: rgba(255,255,255,0.85);
+	border-radius: 14px;
+	backdrop-filter: blur(6px) saturate(110%);
+	box-shadow: 0 10px 40px rgba(16,24,40,0.06);
+}
+.game-area {
+	max-height: calc(100vh - 220px);
+	overflow: auto;
+}
+
+/* Controls spacing helpers */
+.controls-container {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	margin-bottom: 1rem;
+}
+@media (min-width: 720px) {
+	.controls-container { flex-direction: row; align-items: center; }
+}
+.controls-left { display:flex; gap:0.6rem; align-items:center; }
+.controls-right { display:flex; gap:0.9rem; align-items:center; margin-left:auto; }
+
+/* Header, controls and panels colors + spacing */
+.app-header {
+	background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(245,247,255,0.7));
+	padding: 0.8rem 1rem;
+	border-radius: 10px;
+	margin-bottom: 0.8rem;
+}
+.controls-area {
+	background: linear-gradient(90deg, rgba(255,255,255,0.95), rgba(250,252,255,0.95));
+	padding: 0.6rem;
+	border-radius: 8px;
+}
+.game-area-panel {
+	background: linear-gradient(180deg, rgba(250,250,255,0.6), rgba(245,246,255,0.5));
+	padding: 0.8rem;
+	border-radius: 10px;
+	margin-bottom: 0.9rem;
+}
+
+.game-grid-area { padding: 0.4rem; }
+
+.sections-area { gap: 1rem; }
+.panel { padding: 1rem; border-radius: 8px; }
+.panel-progress { background: linear-gradient(90deg, #ffffff, #f8fafc); }
+.panel-leaderboard { background: linear-gradient(90deg, #ffffff, #fff7f5); }
+
+.app-footer { background: transparent; margin-top: 0.8rem; }
+
+/* Slight overall vertical spacing between major blocks */
+.container > * + * { margin-top: 0.6rem; }
+
+/* Card tweaks */
+.card-button {
+	padding: 6px !important;
+	min-height: 56px !important;
+	font-size: 1.05rem !important;
+	border: none;
+	color: inherit;
+	position: relative;
+	overflow: hidden;
+	background-clip: padding-box;
+}
+
+/* Responsive cards grid: auto-fit columns with a small minimum width so cards shrink on small screens */
+
+.cards-grid {
+	grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+	gap: 0.6rem;
+	align-items: stretch;
+}
+
+/* Compact mode: tighter minimums and gaps */
+.cards-grid.compact {
+	grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+	gap: 0.28rem;
+}
+
+/* Card visuals */
+.cards-grid .card-button {
+	padding: 6px !important;
+	min-height: 52px !important;
+	font-size: 1.05rem !important;
+	border-radius: 10px;
+	transition: transform 240ms cubic-bezier(.2,.9,.2,1), box-shadow 240ms ease, background 240ms ease;
+	box-shadow: 0 6px 18px rgba(16,24,40,0.06);
+}
+
+/* Card visual interactions */
+.card-button {
+	transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+	will-change: transform;
+	cursor: pointer;
+}
+.card-button:hover:not(.matched) {
+	transform: translateY(-4px) scale(1.03);
+	box-shadow: 0 6px 18px rgba(16,24,40,0.12);
+}
+.card-button:active:not(.matched) {
+	transform: translateY(-1px) scale(0.995);
+}
+.card-button:focus {
+	outline: 2px solid rgba(99,102,241,0.18);
+}
+
+/* Matched pulse animation */
+.card-button.matched {
+	animation: pulseMatch 900ms ease-out 1;
+	transform-origin: center;
+}
+@keyframes pulseMatch {
+	0% { transform: scale(1); box-shadow: 0 6px 18px rgba(16,24,40,0.12); }
+	40% { transform: scale(1.06); box-shadow: 0 10px 24px rgba(16,24,40,0.16); }
+	100% { transform: scale(1); box-shadow: 0 6px 18px rgba(16,24,40,0.12); }
+}
+
+/* Tighter layout for very small screens (phones) */
+@media (max-width: 480px) {
+	.cards-grid { grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 0.32rem; }
+	.cards-grid .card-button { min-height: 42px !important; font-size: 0.95rem !important; border-radius: 8px; }
+	.container { padding: 10px; margin: 10px; }
+	.p-6 { padding: 0.5rem; }
+}
+
+@media (min-width: 481px) and (max-width: 900px) {
+	.cards-grid { grid-template-columns: repeat(auto-fit, minmax(48px, 1fr)); gap: 0.4rem; }
+	.cards-grid .card-button { min-height: 48px !important; font-size: 1rem !important; }
+}
+
+/* Ensure images and content fill the full card area */
+.card-button img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover; /* cover fills the box; use contain if you prefer no cropping */
+	border-radius: inherit;
+}
+.card-button .card-content {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+}
+.card-button .card-content.emoji {
+	font-size: 1.35rem;
+}
+
+/* Modern card back / front visual using flipped class */
+.card-button { perspective: 800px; }
+.card-button::before {
+	content: '?';
+	position: absolute;
+	inset: 0;
+	display:flex;align-items:center;justify-content:center;
+	font-size:1rem;color:rgba(255,255,255,0.95);
+	opacity:1;transition:opacity 220ms ease, transform 260ms cubic-bezier(.2,.9,.2,1);
+}
+.card-button.bg-gradient-to-br { background-image: linear-gradient(135deg,#6366f1,#8b5cf6); }
+.card-button.flipped::before { opacity:0; transform: translateY(-6px) scale(0.98); }
+.card-button.flipped { transform: translateY(-4px); box-shadow: 0 12px 26px rgba(16,24,40,0.12); }
+.card-button .card-content { opacity: 0; transform: scale(0.98); transition: opacity 220ms ease, transform 220ms cubic-bezier(.2,.9,.2,1); }
+.card-button.flipped .card-content { opacity: 1; transform: scale(1); }
+
+/* Matched shine */
+.card-button.matched { animation: matchedShine 900ms ease-out 1; }
+@keyframes matchedShine { 0% { box-shadow: 0 8px 24px rgba(16,24,40,0.08); } 40% { transform: scale(1.04); box-shadow: 0 18px 40px rgba(16,24,40,0.16); } 100% { transform: scale(1); box-shadow: 0 8px 24px rgba(16,24,40,0.08); } }
+
+/* Compact mode tweaks */
+.cards-grid.compact { grid-template-columns: repeat(auto-fit, minmax(36px, 1fr)); gap: 0.28rem; }
+.cards-grid.compact .card-button { min-height: 38px !important; border-radius: 6px; }
+
+/* Controls and panels visuals */
+.app-header { background: linear-gradient(90deg,#ffffff, rgba(255,255,255,0.85)); padding: 12px; border-radius: 10px; margin-bottom: 12px; }
+.controls-area { background: rgba(255,255,255,0.7); padding: 10px; border-radius: 10px; }
+.game-area-panel { background: linear-gradient(180deg, rgba(255,255,255,0.65), rgba(250,252,255,0.6)); padding: 12px; border-radius: 12px; margin-bottom: 12px; }
+.game-grid-area { padding: 6px; }
+.sections-area { gap: 12px; }
+.panel { padding: 12px; border-radius: 10px; }
+.panel-progress { background: linear-gradient(90deg, #f7fff7, #e6fff0); border: 1px solid rgba(72,187,120,0.06); }
+.panel-leaderboard { background: linear-gradient(90deg, #fff7f8, #fff0f2); border: 1px solid rgba(235,87,87,0.04); }
+.app-footer { background: transparent; margin-top: 12px; }
+
+/* Small responsive tweaks */
+.container > * + * { margin-top: 10px; }
+
+/* Slightly larger emoji for compact mode so they remain readable */
+.cards-grid.compact .card-button .card-content.emoji {
+	font-size: 1.05rem;
+}
+
+
+

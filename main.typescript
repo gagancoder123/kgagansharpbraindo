@@ -1,0 +1,345 @@
+/*
+Concentration (Memory Match) Game - React + TypeScript
+Single-file example suitable for Vite (react-ts) or CRA (tsx)
+
+Features:
+- Classic Concentration / Memory Match gameplay
+- Difficulty options (Easy: 8 pairs, Medium: 12 pairs, Hard: 18 pairs)
+- Timer, move counter, match counter
+- Star rating based on moves/time
+- Local leaderboard stored in localStorage (top 5 fastest/completes)
+- Keyboard accessibility (Arrow keys to navigate, Enter to flip)
+- Responsive layout and simple styling (inline Tailwind-friendly classes)
+- No external libraries required
+
+How to run:
+1. Create project: `npm create vite@latest my-game -- --template react-ts`
+2. Replace src/App.tsx with this file content
+3. (Optional) Add some global CSS for fonts/background; this file uses inline styles so it works out-of-the-box
+4. Run: `npm install` then `npm run dev`
+
+Notes:
+- You can swap icons/emoji for images. Card backs use emojis for simplicity.
+- This is a client-only game; leaderboard is local only. To have persistent leaderboard, wire a backend.
+*/
+
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+
+// ----------------------
+// Types
+// ----------------------
+
+type Card = {
+  id: string; // unique
+  pairId: string; // which pair it belongs to
+  content: string; // emoji or image url
+  matched: boolean;
+};
+
+type Difficulty = 'easy' | 'medium' | 'hard';
+
+// ----------------------
+// Utilities
+// ----------------------
+
+function shuffle<T>(arr: T[]) {
+  // Fisher-Yates
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const EMOJI_POOL = [
+  '🍎','🍌','🍇','🍓','🥑','🍒','🍋','🍉','🥕','🍆','🍍','🥥','🥝','🌽','🥦','🍑','🍐','🍊','🍔','🍕','🍩','🍪','🍫','🍿','🍰','🍯','🧀','🥨'
+];
+
+function generateDeck(pairs: number) {
+  const pool = shuffle(EMOJI_POOL).slice(0, pairs);
+  const deck: Card[] = pool.flatMap((emoji, idx) => {
+    const pairId = `p${idx}`;
+    const a: Card = { id: pairId + 'a', pairId, content: emoji, matched: false };
+    const b: Card = { id: pairId + 'b', pairId, content: emoji, matched: false };
+    return [a, b];
+  });
+  return shuffle(deck);
+}
+
+function formatTime(seconds: number) {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+// ----------------------
+// Local leaderboard storage
+// ----------------------
+
+type Score = { name: string; seconds: number; moves: number; difficulty: Difficulty; date: string };
+const STORAGE_KEY = 'concentration_game_leaderboard_v1';
+
+function loadLeaderboard(): Score[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Score[];
+  } catch {
+    return [];
+  }
+}
+
+function saveScore(score: Score) {
+  const board = loadLeaderboard();
+  board.push(score);
+  // keep only top 20 by time, then moves
+  board.sort((a, b) => a.seconds - b.seconds || a.moves - b.moves);
+  const trimmed = board.slice(0, 20);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+}
+
+// ----------------------
+// Main Component
+// ----------------------
+
+export default function App() {
+  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
+  const [pairs, setPairs] = useState(12);
+  const [deck, setDeck] = useState<Card[]>(() => generateDeck(12));
+  const [flipped, setFlipped] = useState<string[]>([]); // card ids currently flipped
+  const [moves, setMoves] = useState(0);
+  const [matches, setMatches] = useState(0);
+  const [seconds, setSeconds] = useState(0);
+  const [running, setRunning] = useState(false);
+  const timerRef = useRef<number | null>(null);
+  const [locked, setLocked] = useState(false); // while checking match
+  const [name, setName] = useState('Player');
+  const [leaderboard, setLeaderboard] = useState<Score[]>(() => loadLeaderboard());
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+
+  useEffect(()=>{
+    // update pairs when difficulty changes
+    const map:{[k in Difficulty]: number} = { easy: 8, medium: 12, hard: 18 };
+    setPairs(map[difficulty]);
+    restart(map[difficulty]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [difficulty]);
+
+  useEffect(()=>{
+    if (running) {
+      timerRef.current = window.setInterval(()=> setSeconds(s => s+1), 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
+  }, [running]);
+
+  useEffect(()=>{
+    // update leaderboard view when storage changes or save happens
+    const onStorage = ()=> setLeaderboard(loadLeaderboard());
+    window.addEventListener('storage', onStorage);
+    return ()=> window.removeEventListener('storage', onStorage);
+  }, []);
+
+  function restart(p = pairs) {
+    setDeck(generateDeck(p));
+    setFlipped([]);
+    setMoves(0);
+    setMatches(0);
+    setSeconds(0);
+    setRunning(false);
+    setLocked(false);
+    setFocusedIndex(null);
+  }
+
+  function handleFlip(cardId: string) {
+    if (locked) return;
+    const card = deck.find(c => c.id === cardId);
+    if (!card || card.matched) return;
+    if (!running) setRunning(true);
+
+    // already flipped
+    if (flipped.includes(cardId)) return;
+
+    if (flipped.length === 0) {
+      setFlipped([cardId]);
+      // focus index
+      const idx = deck.findIndex(c=>c.id===cardId);
+      setFocusedIndex(idx);
+      return;
+    }
+
+    if (flipped.length === 1) {
+      const firstId = flipped[0];
+      const firstCard = deck.find(c=>c.id===firstId)!;
+      setFlipped([firstId, cardId]);
+      setLocked(true);
+      setMoves(m => m+1);
+
+      // check match
+      if (firstCard.pairId === card.pairId) {
+        // mark matched
+        setTimeout(()=>{
+          setDeck(prev => prev.map(c => c.pairId === card.pairId ? {...c, matched: true} : c));
+          setFlipped([]);
+          setMatches(m => m+1);
+          setLocked(false);
+          // check win
+          const newMatchCount = matches + 1;
+          if (newMatchCount === pairs) {
+            setRunning(false);
+            // save score
+            const s: Score = { name: name || 'Player', seconds, moves: moves+1, difficulty, date: new Date().toISOString() };
+            saveScore(s);
+            setLeaderboard(loadLeaderboard());
+          }
+        }, 600);
+      } else {
+        // not a match -> flip back after delay
+        setTimeout(()=>{
+          setFlipped([]);
+          setLocked(false);
+        }, 800);
+      }
+      return;
+    }
+  }
+
+  const allMatched = useMemo(()=> deck.every(c => c.matched), [deck]);
+
+  // star rating based on moves and time (naive)
+  const stars = useMemo(()=>{
+    if (moves === 0) return 3;
+    const ratio = moves / pairs;
+    if (ratio <= 1.2) return 3;
+    if (ratio <= 2) return 2;
+    return 1;
+  }, [moves, pairs]);
+
+  // keyboard navigation for accessibility
+  useEffect(()=>{
+    function onKey(e: KeyboardEvent) {
+      if (!gridRef.current) return;
+      const total = deck.length;
+      if (total === 0) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocusedIndex(fi => {
+          const next = (fi === null ? 0 : (fi + 1) % total);
+          return next;
+        });
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocusedIndex(fi => {
+          const prev = (fi === null ? 0 : (fi - 1 + total) % total);
+          return prev;
+        });
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (focusedIndex !== null) {
+          const card = deck[focusedIndex];
+          handleFlip(card.id);
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return ()=> window.removeEventListener('keydown', onKey);
+  }, [deck, focusedIndex, handleFlip]);
+
+  // For pointer focus: when focusedIndex changes, focus that card button
+  useEffect(()=>{
+    if (focusedIndex === null) return;
+    const btn = document.querySelector<HTMLButtonElement>(`button[data-index="${focusedIndex}"]`);
+    if (btn) btn.focus();
+  }, [focusedIndex]);
+
+  return (
+    <div className="min-h-screen flex items-start justify-center p-6" style={{background: 'linear-gradient(180deg,#f8fafc,#eef2ff)'}}>
+      <div className="w-full max-w-5xl">
+        <header className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Concentration — Memory Match</h1>
+            <p className="text-sm text-gray-600">Flip cards, find pairs, train your focus.</p>
+          </div>
+          <div className="text-right">
+            <div className="mb-2">Time: <strong>{formatTime(seconds)}</strong></div>
+            <div>Moves: <strong>{moves}</strong></div>
+            <div>Stars: {'★'.repeat(stars)}{'☆'.repeat(3-stars)}</div>
+          </div>
+        </header>
+
+        <div className="mb-4 flex flex-col md:flex-row gap-4">
+          <div className="flex gap-2 items-center">
+            <label className="text-sm">Difficulty:</label>
+            <select className="p-2 border rounded" value={difficulty} onChange={e=>setDifficulty(e.target.value as Difficulty)}>
+              <option value="easy">Easy (8 pairs)</option>
+              <option value="medium">Medium (12 pairs)</option>
+              <option value="hard">Hard (18 pairs)</option>
+            </select>
+            <button className="p-2 border rounded ml-2" onClick={()=> restart(pairs)}>Restart</button>
+          </div>
+
+          <div className="flex gap-2 items-center ml-auto">
+            <input className="p-2 border rounded" value={name} onChange={e=>setName(e.target.value)} placeholder="Your name" />
+            <button className="p-2 bg-blue-600 text-white rounded" onClick={()=>{ setRunning(r=>!r); if (!running) setRunning(true); }}>{running? 'Pause':'Start'}</button>
+          </div>
+        </div>
+
+        <main>
+          <div ref={gridRef} className="grid gap-3" style={{gridTemplateColumns: `repeat(${Math.min(6, Math.ceil(Math.sqrt(pairs*2)))}, minmax(0,1fr))`}}>
+            {deck.map((card, idx) => {
+              const isFlipped = flipped.includes(card.id) || card.matched || allMatched;
+              return (
+                <button
+                  key={card.id}
+                  data-index={idx}
+                  onClick={()=> handleFlip(card.id)}
+                  aria-pressed={isFlipped}
+                  aria-label={card.matched ? `Matched ${card.content}` : `Card ${idx+1}`}
+                  className={`aspect-square rounded-lg flex items-center justify-center text-3xl select-none focus:outline-none focus:ring-4 transition transform ${isFlipped ? 'bg-white shadow-lg' : 'bg-gradient-to-br from-purple-500 to-indigo-600 text-white'}`}
+                  style={{padding:12, minHeight:80}}
+                >
+                  <span style={{opacity: isFlipped ? 1 : 0}}>{card.content}</span>
+                  {!isFlipped && <span aria-hidden style={{position:'absolute', fontSize:18}}>?</span>}
+                </button>
+              );
+            })}
+          </div>
+        </main>
+
+        <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 bg-white rounded shadow">
+            <h3 className="font-semibold">Progress</h3>
+            <div className="mt-2">Pairs found: <strong>{matches}/{pairs}</strong></div>
+            <div className="mt-2">Status: <strong>{allMatched ? 'Completed 🎉' : (running ? 'Running' : 'Idle')}</strong></div>
+          </div>
+
+          <div className="p-4 bg-white rounded shadow">
+            <h3 className="font-semibold">Leaderboard (local)</h3>
+            <ol className="mt-2 list-decimal list-inside">
+              {leaderboard.length === 0 && <li className="text-sm text-gray-500">No scores yet - be the first!</li>}
+              {leaderboard.map((s, i)=> (
+                <li key={i} className="text-sm">
+                  <strong>{s.name}</strong> — {formatTime(s.seconds)} / {s.moves} moves / {s.difficulty} <span className="text-xs text-gray-500">({new Date(s.date).toLocaleString()})</span>
+                </li>
+              ))}
+            </ol>
+            <div className="mt-3 flex gap-2">
+              <button className="p-2 border rounded" onClick={()=>{ localStorage.removeItem(STORAGE_KEY); setLeaderboard([]); }}>Clear Leaderboard</button>
+              <button className="p-2 border rounded" onClick={()=> setLeaderboard(loadLeaderboard())}>Refresh</button>
+            </div>
+          </div>
+        </section>
+
+        <footer className="mt-6 text-center text-xs text-gray-500">
+          Tip: Use arrow keys to navigate cards and Enter to flip. Difficulty changes restart the game.
+        </footer>
+      </div>
+    </div>
+  );
+}
